@@ -20,7 +20,7 @@ public class Day08 : BaseDay
             {
                 if (i == 0 || i == _input.Length - 1 || j == 0 || j == _input[0].Length - 1)
                 {
-                    matches.Add(Tuple.Create<int, int>( i, j ));
+                    matches.Add(Tuple.Create( i, j ));
                 }
                 else
                 {
