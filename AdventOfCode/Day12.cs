@@ -1,10 +1,14 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AdventOfCode;
 
 public class Day12 : BaseDay
 {
     private readonly char[][] _input;
+    private int _tasksRunning = 1;
 
     public Day12()
     {
@@ -24,7 +28,7 @@ public class Day12 : BaseDay
         int[] endLocation = new int[2];
         List<Tuple<int, int>> visited = new();
         List<int> decisions = new();
-        List<int> results = new();
+        ConcurrentQueue<int> results = new();
 
         for (int i = 0; i < map.Length; i++)
         {
@@ -44,7 +48,12 @@ public class Day12 : BaseDay
         map[location[0]][location[1]] = 'a';
         map[endLocation[0]][endLocation[1]] = 'z';
 
-        TraverseGraph(map, location, endLocation, visited, results);
+        TraverseGraph(map, location, endLocation, visited, results, 0);
+
+        while (_tasksRunning != 0)
+        {
+
+        }
 
         int result = results.Min();
         return new(result.ToString());
@@ -55,45 +64,22 @@ public class Day12 : BaseDay
         throw new NotImplementedException();
     }
 
-    private void TraverseGraph(char[][] map, int[] location, int[] endLocation, List<Tuple<int, int>> visited, List<int> results)
+    private void TraverseGraph(char[][] map, int[] location, int[] endLocation, List<Tuple<int, int>> visited, ConcurrentQueue<int> results, int result)
     {
-        int result = 0;
-        bool backwards = false;
         Stack<int[]> moves = new();
         List<int> desicions = new();
 
         while (location[0] != endLocation[0] || location[1] != endLocation[1])
         {
-            Console.WriteLine($"{location[0]}, {location[1]}");
-            Console.WriteLine($"{result}");
-            Console.WriteLine($"{backwards}");
+            visited.Add(Tuple.Create(location[0], location[1]));
 
-            if (!backwards)
-            {
-                var locationTuple = Tuple.Create(location[0], location[1]);
-                int x = (int)locationTuple.Item1;
-                int y = (int)locationTuple.Item2;
-
-                Tuple<int, int> convertedTuple = new Tuple<int, int>(x, y);
-
-                visited.Add(convertedTuple);
-            }
-            else
-            {
-                var locationTuple = Tuple.Create(location[0], location[1]);
-                int x = (int)locationTuple.Item1;
-                int y = (int)locationTuple.Item2;
-                Tuple<int, int> convertedTuple = new Tuple<int, int>(x, y);
-
-                visited.Remove(convertedTuple);
-            }
-                
             int[][] directions = ValidDirections(map, location, visited);
             int[] direction = new int[] { 0, 0 };
                 
             if (directions.Length == 0)
             {
-                backwards = true;
+                Interlocked.Decrement(ref _tasksRunning);
+                return;
             }
             else if (directions.Length == 1)
             {
@@ -101,53 +87,45 @@ public class Day12 : BaseDay
             }
             else
             {
-                if (backwards)
+                foreach (int[] directionThread in directions)
                 {
-                    backwards = false;
+                    int[] locationCopy = (int[])location.Clone();
+                    locationCopy[0] += directionThread[0];
+                    locationCopy[1] += directionThread[1];
 
-                    direction = directions[desicions.Last() + 1];
-                    desicions.Add(desicions.Last() + 1);
-                    desicions.RemoveAt(desicions.Count - 1);
-                }
-                else
-                {
-                    direction = directions[0];
-                    desicions.Add(0);
-                }
-            }
+                    if (locationCopy[0] == endLocation[0] && locationCopy[1] == endLocation[1])
+                    {
+                        location = locationCopy;
+                    }
 
-            if (backwards)
-            {
-                direction = moves.Pop();
-                direction = new int[] { -direction[0], -direction[1] };
-                visited.Remove(Tuple.Create(location[0], location[1]));
-            }
-            else
-            {
-                moves.Push(direction);
+                    List<Tuple<int, int>> visitedClone = new();
+                    visitedClone.AddRange(visited.ToArray());
+                    visitedClone.Add(Tuple.Create(locationCopy[0], locationCopy[1]));
+
+                    var t = Task.Run(() => TraverseGraph(map, locationCopy, endLocation, visitedClone, results, result + 1));
+                    //t.Wait();
+                    Interlocked.Increment(ref _tasksRunning);
+                }
+                Interlocked.Decrement(ref _tasksRunning);
+                return;
             }
                 
             location[0] += direction[0];
             location[1] += direction[1];
-                
-            if (backwards)
-            {
-                visited.Remove(Tuple.Create(location[0], location[1]));
-            }
 
-            if (!backwards)
+            result++;
+            if (!results.IsEmpty)
             {
-                result++;
-            }
-            else
-            {
-                result--;
-            }
+                if (result >= results.Min())
+                {
+                    Interlocked.Decrement(ref _tasksRunning);
+                    return;
+                }
+            }          
         }
 
-        Console.WriteLine("Finished");
-
-        results.Add(result);
+        results.Enqueue(result);
+        Interlocked.Decrement(ref _tasksRunning);
     }
 
     private int[][] ValidDirections(char[][] map, int[] location, List<Tuple<int, int>> visited)
