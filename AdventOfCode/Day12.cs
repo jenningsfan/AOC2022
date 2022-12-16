@@ -87,6 +87,8 @@ public class Day12 : BaseDay
             }
             else
             {
+                List<int[]> newLocations = new();
+
                 foreach (int[] directionThread in directions)
                 {
                     int[] locationCopy = (int[])location.Clone();
@@ -98,14 +100,25 @@ public class Day12 : BaseDay
                         location = locationCopy;
                     }
 
+                    newLocations.Add(locationCopy);
+                }
+
+                newLocations.Sort((a, b) => ManhattanDistance(a, endLocation) - ManhattanDistance(b, endLocation));
+
+                foreach (int[] locationCopy in newLocations)
+                {
                     List<Tuple<int, int>> visitedClone = new();
                     visitedClone.AddRange(visited.ToArray());
                     visitedClone.Add(Tuple.Create(locationCopy[0], locationCopy[1]));
 
-                    var t = Task.Run(() => TraverseGraph(map, locationCopy, endLocation, visitedClone, results, result + 1));
-                    //t.Wait();
                     Interlocked.Increment(ref _tasksRunning);
+                    var t = Task.Run(() => TraverseGraph(map, locationCopy, endLocation, visitedClone, results, result + 1));
+                    if (_tasksRunning > 128)
+                    {
+                        t.Wait();
+                    }         
                 }
+
                 Interlocked.Decrement(ref _tasksRunning);
                 return;
             }
@@ -158,6 +171,10 @@ public class Day12 : BaseDay
         return directions.ToArray();
     }
 
+    private int ManhattanDistance(int[] a, int[] b)
+    {
+        return Math.Abs(a[0] - b[0]) + Math.Abs(a[1] - b[1]);
+    }
     private char[][] ParseInput()
     {
         string[] input = File.ReadAllText(InputFilePath).Split("\n");
