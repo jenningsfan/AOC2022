@@ -76,7 +76,54 @@ public class Day12 : BaseDay
 
     public override ValueTask<string> Solve_2()
     {
-        throw new NotImplementedException();
+        char[][] map = new char[_input.Length][];
+
+        for (int i = 0; i < _input.Length; i++)
+        {
+            map[i] = (char[])_input[i].Clone();
+        }
+
+        int[] location = new int[2];
+        int[] endLocation = new int[2];
+
+        for (int i = 0; i < map.Length; i++)
+        {
+            int posLocation = Array.FindIndex(map[i], row => row == 'S');
+            int posEndLocation = Array.FindIndex(map[i], row => row == 'E');
+
+            if (posLocation != -1)
+            {
+                location = new int[] { i, posLocation };
+            }
+            if (posEndLocation != -1)
+            {
+                endLocation = new int[] { i, posEndLocation };
+            }
+        }
+
+        map[location[0]][location[1]] = 'a';
+        map[endLocation[0]][endLocation[1]] = 'z';
+
+        List<int> results = new();
+
+        for (int i = 0; i < map.Length; i++)
+        {
+            for (int j = 0; j < map[i].Length; j++)
+            {
+                if (map[i][j] == 'a')
+                {
+                    try
+                    {
+                        results.Add(TraverseGraph(map, new int[] { i, j }, endLocation));
+                    }
+                    catch
+                    {
+
+                    }
+                }
+            }
+        }
+        return new(results.Min().ToString());
     }
 
     private int TraverseGraph(char[][] map, int[] location, int[] endLocation)
@@ -99,7 +146,6 @@ public class Day12 : BaseDay
             {
                 return current.PathLength();
             }
-
 
             int[][] directions = ValidDirections(map, location);
 
@@ -184,7 +230,7 @@ public class Day12 : BaseDay
 
     private int ManhattanDistance(int[] a, int[] b)
     {
-        return Math.Abs(a[0] - b[0]) ^ 2 + Math.Abs(a[1] - b[1]) ^ 2;
+        return Math.Abs(a[0] - b[0]) + Math.Abs(a[1] - b[1]);
     }
     private char[][] ParseInput()
     {
