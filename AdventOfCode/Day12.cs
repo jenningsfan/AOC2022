@@ -113,13 +113,10 @@ public class Day12 : BaseDay
                 if (map[i][j] == 'a')
                 {
                     try
-                    {
-                        results.Add(TraverseGraph(map, new int[] { i, j }, endLocation));
-                    }
-                    catch
-                    {
-
-                    }
+                    { 
+                        results.Add(TraverseGraph(map, new int[] { i, j }, endLocation)); 
+                    } 
+                    catch { }
                 }
             }
         }
