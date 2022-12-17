@@ -5,10 +5,34 @@ using System.Threading.Tasks;
 
 namespace AdventOfCode;
 
+public class Node
+{
+    public Node(int fScore, int[] location, Node parent)
+    {
+        FScore = fScore;
+        Location = location;
+        Parent = parent;
+    }
+
+    public int PathLength()
+    {
+        if (Parent == null)
+        {
+            return 0;
+        }
+        else
+        {
+            return Parent.PathLength() + 1;
+        }
+    }
+
+    public int FScore { get; set; }
+    public int[] Location { get; set; }
+    public Node Parent { get; set; }
+}
 public class Day12 : BaseDay
 {
     private readonly char[][] _input;
-    private int _tasksRunning = 1;
 
     public Day12()
     {
@@ -26,9 +50,6 @@ public class Day12 : BaseDay
 
         int[] location = new int[2];
         int[] endLocation = new int[2];
-        List<Tuple<int, int>> visited = new();
-        List<int> decisions = new();
-        ConcurrentQueue<int> results = new();
 
         for (int i = 0; i < map.Length; i++)
         {
@@ -48,14 +69,8 @@ public class Day12 : BaseDay
         map[location[0]][location[1]] = 'a';
         map[endLocation[0]][endLocation[1]] = 'z';
 
-        TraverseGraph(map, location, endLocation, visited, results, 0);
+        int result = TraverseGraph(map, location, endLocation);
 
-        while (_tasksRunning != 0)
-        {
-
-        }
-
-        int result = results.Min();
         return new(result.ToString());
     }
 
@@ -64,84 +79,61 @@ public class Day12 : BaseDay
         throw new NotImplementedException();
     }
 
-    private void TraverseGraph(char[][] map, int[] location, int[] endLocation, List<Tuple<int, int>> visited, ConcurrentQueue<int> results, int result)
+    private int TraverseGraph(char[][] map, int[] location, int[] endLocation)
     {
-        Stack<int[]> moves = new();
-        List<int> desicions = new();
+        List<Node> open = new();
+        List<Node> closed = new();
 
-        while (location[0] != endLocation[0] || location[1] != endLocation[1])
-        {
-            visited.Add(Tuple.Create(location[0], location[1]));
+        open.Add(new Node(0, (int[])location.Clone(), null));
 
-            int[][] directions = ValidDirections(map, location, visited);
-            int[] direction = new int[] { 0, 0 };
-                
-            if (directions.Length == 0)
+        while (true)
+        { 
+            open = open.OrderBy(x => x.FScore).ToList();
+            Node current = open[0];
+            location = current.Location;
+
+            closed.Add(open[0]);
+            open.RemoveAt(0);
+
+            if (CompareArray(location, endLocation))
             {
-                Interlocked.Decrement(ref _tasksRunning);
-                return;
+                return current.PathLength();
             }
-            else if (directions.Length == 1)
-            {
-                direction = directions[0];
-            }
-            else
-            {
-                List<int[]> newLocations = new();
 
-                foreach (int[] directionThread in directions)
+
+            int[][] directions = ValidDirections(map, location);
+
+            foreach (int[] neighbour in directions)
+            {
+                int[] locationCopy = new int[2];
+                locationCopy[0] = location[0] + neighbour[0];
+                locationCopy[1] = location[1] + neighbour[1];
+
+                if (closed.Any(tuple => CompareArray(tuple.Location, locationCopy)))
                 {
-                    int[] locationCopy = (int[])location.Clone();
-                    locationCopy[0] += directionThread[0];
-                    locationCopy[1] += directionThread[1];
+                    continue;
+                }
 
-                    if (locationCopy[0] == endLocation[0] && locationCopy[1] == endLocation[1])
+                int fScore = current.PathLength() + ManhattanDistance(locationCopy, endLocation);
+                IEnumerable<Node> item = open.Where(tuple => CompareArray(tuple.Location, locationCopy));
+
+                if (item.Count() == 0 || item.Any(tuple => tuple.FScore > fScore))
+                {
+                    for (int i = 0; i < open.Count; i++)
                     {
-                        location = locationCopy;
+                        if (CompareArray(open[i].Location, locationCopy))
+                        {
+                            open.RemoveAt(i);
+                        }
                     }
 
-                    newLocations.Add(locationCopy);
+                    open.Add(new Node(fScore, locationCopy, current));
                 }
-
-                newLocations.Sort((a, b) => ManhattanDistance(a, endLocation) - ManhattanDistance(b, endLocation));
-
-                foreach (int[] locationCopy in newLocations)
-                {
-                    List<Tuple<int, int>> visitedClone = new();
-                    visitedClone.AddRange(visited.ToArray());
-                    visitedClone.Add(Tuple.Create(locationCopy[0], locationCopy[1]));
-
-                    Interlocked.Increment(ref _tasksRunning);
-                    var t = Task.Run(() => TraverseGraph(map, locationCopy, endLocation, visitedClone, results, result + 1));
-                    if (_tasksRunning > 128)
-                    {
-                        t.Wait();
-                    }         
-                }
-
-                Interlocked.Decrement(ref _tasksRunning);
-                return;
             }
-                
-            location[0] += direction[0];
-            location[1] += direction[1];
-
-            result++;
-            if (!results.IsEmpty)
-            {
-                if (result >= results.Min())
-                {
-                    Interlocked.Decrement(ref _tasksRunning);
-                    return;
-                }
-            }          
         }
-
-        results.Enqueue(result);
-        Interlocked.Decrement(ref _tasksRunning);
     }
 
-    private int[][] ValidDirections(char[][] map, int[] location, List<Tuple<int, int>> visited)
+    private int[][] ValidDirections(char[][] map, int[] location)
     {
         List<int[]> directions = new() { };
         int[][] moves = new int[4][]
@@ -158,9 +150,8 @@ public class Day12 : BaseDay
             {
                 int newX = location[0] + moves[i][0];
                 int newY = location[1] + moves[i][1];
-                Tuple<int, int> xy = new(newX, newY);
 
-                if (map[newX][newY] <= map[location[0]][location[1]] + 1 && !visited.Contains(xy))
+                if (map[newX][newY] <= map[location[0]][location[1]] + 1)
                 {
                     directions.Add(moves[i]);
                 }
@@ -171,9 +162,29 @@ public class Day12 : BaseDay
         return directions.ToArray();
     }
 
+    private bool CompareArray(int[] array1, int[] array2)
+    {
+        if (array1.Length != array2.Length)
+        {
+            return false;
+        }
+        else
+        {
+            for (int i = 0; i < array1.Length; i++)
+            {
+                if (array1[i] != array2[i])
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     private int ManhattanDistance(int[] a, int[] b)
     {
-        return Math.Abs(a[0] - b[0]) + Math.Abs(a[1] - b[1]);
+        return Math.Abs(a[0] - b[0]) ^ 2 + Math.Abs(a[1] - b[1]) ^ 2;
     }
     private char[][] ParseInput()
     {
