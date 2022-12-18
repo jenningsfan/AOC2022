@@ -1,59 +1,12 @@
 ﻿namespace AdventOfCode;
 
-public class Day13 : BaseDay
+public class PacketComparer : IComparer<object>
 {
-    private readonly List<Tuple<List<object>, List<object>>> _input;
-
-    public Day13()
-    {
-        _input = ParseInput();
-    }
-
-    public override ValueTask<string> Solve_1()
-    {
-        int result = 0;
-
-        for (int i = 0; i < _input.Count; i++)
-        {
-            if (ComparePair(_input[i]))
-            {
-                result += i + 1;
-            }
-        }
-        
-        return new(result.ToString());
-    }
-
-    public override ValueTask<string> Solve_2()
-    {
-        throw new NotImplementedException();
-    }
-
-    private bool ComparePair(Tuple<List<object>, List<object>> pair)
-    {
-        if (Compare(pair.Item1, pair.Item2) == 0)
-        {
-            return true;
-        }
-        else { return false; }
-    }
-
-    private int Compare(object left, object right)
+    public int Compare(object left, object right)
     {
         if (left is int && right is int)
         {
-            if ((int)left < (int)right)
-            {
-                return 0;   // Right order
-            }
-            else if ((int)left > (int)right)
-            {
-                return 1;   // Wrong order
-            }
-            else
-            {
-                return 2;   // Continue checking
-            }
+            return (int)left - (int)right;
         }
         else if (left is List<object> && right is List<object>)
         {
@@ -63,11 +16,11 @@ public class Day13 : BaseDay
                 {
                     int result = Compare(((List<object>)left)[i], ((List<object>)right)[i]);
 
-                    if (result == 0)
+                    if (result <= -1)
                     {
-                        return 0;   // Right order
+                        return -1;   // Right order
                     }
-                    else if (result == 1)
+                    else if (result >= 1)
                     {
                         return 1;   // Wrong order
                     }
@@ -79,11 +32,11 @@ public class Day13 : BaseDay
             }
             if (((List<object>)left).Count < ((List<object>)right).Count)
             {
-                return 0;   // Right order
+                return -1;   // Right order
             }
             else
             {
-                return 2;
+                return 0;
             }
         }
         else
@@ -103,15 +56,66 @@ public class Day13 : BaseDay
         }
     }
 
-    private List<Tuple<List<object>, List<object>>> ParseInput()
+}
+
+public class Day13 : BaseDay
+{
+    private readonly List<List<object>> _input;
+
+    public Day13()
+    {
+        _input = ParseInput();
+    }
+
+    public override ValueTask<string> Solve_1()
+    {
+        int result = 0;
+
+        for (int i = 0; i < _input.Count / 2; i++)
+        {
+            if (ComparePair(Tuple.Create(_input[i * 2], _input[i * 2 + 1])))
+            {
+                result += i + 1;
+            }
+        }
+        
+        return new(result.ToString());
+    }
+
+    public override ValueTask<string> Solve_2()
+    {
+        List<object> dividers = new();
+        object divider1 = (new List<object> { 2 });
+        object divider2 = (new List<object> { 6 });
+        dividers.Add(divider1);
+        dividers.Add(divider2);
+
+        foreach (object item in _input)
+        {
+            dividers.Add(item);
+        }
+
+        dividers.Sort(new PacketComparer());
+
+        return new(((dividers.IndexOf(divider1) + 1) * (dividers.IndexOf(divider2) + 1)).ToString());
+    }
+
+    private bool ComparePair(Tuple<List<object>, List<object>> pair)
+    {
+        if (new PacketComparer().Compare(pair.Item1, pair.Item2) == -1)
+        {
+            return true;
+        }
+        else { return false; }
+    }
+
+    private List<List<object>> ParseInput()
     {
         string[] input = File.ReadAllText(InputFilePath).Split("\n");
-        List<Tuple<List<object>, List<object>>> packets = new();
+        List<List<object>> packets = new();
 
         for (int i = 0; i < input.Length; i+=3)
         {
-            List<object>[] pair = new List<object>[2];
-
             for (int j = 0; j < 2; j++)
             {
                 List<object> packet = new List<object>();
@@ -121,7 +125,6 @@ public class Day13 : BaseDay
                 packet = currList;
 
                 oldList.Add(currList);
-                pair[j] = packet;
 
                 foreach (char section in input[i + j])
                 {
@@ -166,8 +169,9 @@ public class Day13 : BaseDay
                         number.Add(section);
                     }                      
                 }
+
+                packets.Add(packet);
             }
-            packets.Add(Tuple.Create(pair[0], pair[1]));
         }
 
         return packets;
