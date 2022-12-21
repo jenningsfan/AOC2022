@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace AdventOfCode;
 
@@ -49,15 +50,20 @@ public class Day15 : BaseDay
     public override ValueTask<string> Solve_2()
     {
         int resultSize = 4000000;
-        HashSet<Coordinate> possible = new();
-        HashSet<Coordinate> notPossible = new();
 
-        foreach (Tuple<Coordinate, Coordinate> line in _input)
+        //long frequency = Stopwatch.Frequency;
+        //long nanosecPerTick = (1000L * 1000L * 1000L) / frequency;
+
+        for (int i = 0; i < resultSize; i++)
         {
-            int manhattan = ManhattanDistance(line.Item1, line.Item2);
+            //var watch = new System.Diagnostics.Stopwatch();
+            //watch.Start();
 
-            for (int i = line.Item1.Item1 - manhattan / 2; i < line.Item1.Item1 + manhattan / 2; i++)
+            List<List<int>> possible = new();
+
+            foreach (Tuple<Coordinate, Coordinate> line in _input)
             {
+                int manhattan = ManhattanDistance(line.Item1, line.Item2);
                 if (Math.Abs((i - line.Item1.Item2)) < manhattan)
                 {
                     int length = (manhattan - Math.Abs((i - line.Item1.Item2))) * 2 + 1;
@@ -66,29 +72,50 @@ public class Day15 : BaseDay
                     int left = middle - lengthSide;
                     int right = middle + lengthSide;
 
-                    if (left > 0 && right < resultSize)
-                    {
-                        Coordinate position = Tuple.Create(i, right + 1);
-                        if (!notPossible.Contains(position))
-                        {
-                            possible.Add(position);
-                        }                 
-                    }
-
-                    for (int j = left; j < right; j++)
-                    {
-                        //possible.Remove(Tuple.Create(i, j));
-                        notPossible.Add(Tuple.Create(i, j));
-                    }
-
-                    possible.RemoveWhere(n => n.Item2 >= left && n.Item2 <= right && n.Item1 == i);
+                    possible.Add(new List<int> { Math.Max(0, left), Math.Min(resultSize, right) });
                 }
+
+                //if (possible.Count == resultSize) break;
+            }
+
+            possible = MergeIntervals(possible);
+
+            if (possible.Count == 2)
+            {
+                long x = possible[0][1] + 1;
+                //Console.WriteLine($"x: {x}, y: {i}");
+                return new((x * 4000000L + i).ToString());
+            }
+
+            //watch.Stop();
+            //Console.WriteLine($"{watch.ElapsedTicks * nanosecPerTick}");
+        }
+
+        return new(0.ToString());
+    }
+
+    private List<List<int>> MergeIntervals(List<List<int>> intervals)
+    {
+        List<List<int>> sortedIntervals = intervals.OrderBy(t => t[0]).ToList();
+        List<List<int>> stack = new();
+        stack.Add(sortedIntervals[0]);
+
+        for (int i = 1; i < sortedIntervals.Count; i++) // 1 is right. Already added to stack first one.
+        {
+            List<int> interval = sortedIntervals[i];
+
+            // Check for overlapping interval
+            if (stack[^1][0] <= interval[0] && interval[0] <= stack[^1][^1])
+            {
+                stack[^1][^1] = Math.Max(stack[^1][^1], interval[^1]);
+            }
+            else
+            {
+                stack.Add(interval);
             }
         }
 
-        Coordinate location = possible.ToArray()[0];
-        int result = location.Item2 * 4000000 + location.Item1;
-        return new(result.ToString());
+        return stack;
     }
 
     private int ManhattanDistance(Coordinate a, Coordinate b)

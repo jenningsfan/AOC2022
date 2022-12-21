@@ -8,7 +8,7 @@ Sensor at x=3907456, y=3325610: closest beacon is at x=3696221, y=3226373
 Sensor at x=3354177, y=3435919: closest beacon is at x=3696221, y=3226373
 Sensor at x=3997379, y=3071868: closest beacon is at x=3696221, y=3226373
 Sensor at x=145143, y=1714962: closest beacon is at x=-518661, y=2000000
-Sensor at x=611563, y=3148864: closest beacon is at x=955472, y=3457514 
+Sensor at x=611563, y=3148864: closest beacon is at x=955472, y=3457514
 Sensor at x=3080405, y=3904777: closest beacon is at x=3696221, y=3226373
 Sensor at x=644383, y=10732: closest beacon is at x=364635, y=-294577
 Sensor at x=3229566, y=1694167: closest beacon is at x=2827226, y=1579510
