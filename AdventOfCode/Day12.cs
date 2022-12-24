@@ -5,31 +5,6 @@ using System.Threading.Tasks;
 
 namespace AdventOfCode;
 
-public class Node
-{
-    public Node(int fScore, int[] location, Node parent)
-    {
-        FScore = fScore;
-        Location = location;
-        Parent = parent;
-    }
-
-    public int PathLength()
-    {
-        if (Parent == null)
-        {
-            return 0;
-        }
-        else
-        {
-            return Parent.PathLength() + 1;
-        }
-    }
-
-    public int FScore { get; set; }
-    public int[] Location { get; set; }
-    public Node Parent { get; set; }
-}
 public class Day12 : BaseDay
 {
     private readonly char[][] _input;
@@ -125,15 +100,15 @@ public class Day12 : BaseDay
 
     private int TraverseGraph(char[][] map, int[] location, int[] endLocation)
     {
-        List<Node> open = new();
-        List<Node> closed = new();
+        List<GridNode> open = new();
+        List<GridNode> closed = new();
 
-        open.Add(new Node(0, (int[])location.Clone(), null));
+        open.Add(new GridNode(0, (int[])location.Clone(), null));
 
         while (true)
         { 
             open = open.OrderBy(x => x.FScore).ToList();
-            Node current = open[0];
+            GridNode current = open[0];
             location = current.Location;
 
             closed.Add(open[0]);
@@ -158,7 +133,7 @@ public class Day12 : BaseDay
                 }
 
                 int fScore = current.PathLength() + ManhattanDistance(locationCopy, endLocation);
-                IEnumerable<Node> item = open.Where(tuple => CompareArray(tuple.Location, locationCopy));
+                IEnumerable<GridNode> item = open.Where(tuple => CompareArray(tuple.Location, locationCopy));
 
                 if (item.Count() == 0 || item.Any(tuple => tuple.FScore > fScore))
                 {
@@ -170,7 +145,7 @@ public class Day12 : BaseDay
                         }
                     }
 
-                    open.Add(new Node(fScore, locationCopy, current));
+                    open.Add(new GridNode(fScore, locationCopy, current));
                 }
             }
         }
