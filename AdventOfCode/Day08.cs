@@ -11,7 +11,6 @@ public class Day08 : BaseDay
 
     public override ValueTask<string> Solve_1()
     {
-        int result = 0;
         List<Tuple<int, int>> matches = new List<Tuple<int, int>>  ();
         
         for (int i = 0; i < _input.Length; i++)

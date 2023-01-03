@@ -1,183 +1,118 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Collections;
+using System.Text.RegularExpressions;
 
 namespace AdventOfCode;
 
-class ValveNode : AStarNode
+using CacheKey = Tuple<int, int, int, int, int, bool>;
+
+class ValveNode
 {
-    public ValveNode(int fScore, int flow, string name, AStarNode pathParent, List<AStarNode> neighbours) : base(fScore, pathParent, neighbours)
+    public ValveNode(int flow, string name, List<int> neighbourIds)
     {
         Flow = flow;
         Name = name;
+        NeighbourIds = neighbourIds;
     }
 
     public int Flow { get; set; }
     public string Name { get; set; }
+    public List<int> NeighbourIds { get; set; }
 }
 
 public class Day16 : BaseDay
 {
     private readonly List<ValveNode> _input;
-
+    private Dictionary<CacheKey, int> cache;
     public Day16()
     {
         _input = ParseInput();
+        cache = new Dictionary<CacheKey, int>();
     }
 
     public override ValueTask<string> Solve_1()
     {
-        List<ValveNode> working = new();    // Nodes that have a flow rate above 0
-        ValveNode currentNode = _input.Find(x => x.Name == "AA");
-        working.Add(currentNode);
+        int currentNode = _input.FindIndex(x => x.Name == "AA");
 
-        for (int i = 0; i < _input.Count; i++)
-        {
-            if (_input[i].Flow > 0)
-            {
-                working.Add(_input[i]);
-            }  
-        }
-
-        int currentFlow = 0;
-        int movingTimeLeft = 0;
-        int result = 0;
-
-        for (int i = 0; i < 30; i++) {      
-            result += currentFlow;
-
-            if (movingTimeLeft == 0 && working.Count > 0)
-            {
-                currentFlow += currentNode.Flow;
-                movingTimeLeft = 1;
-                if (working.Count > 0)
-                {
-                    currentNode = BestNode(currentNode, working, 30 - i);
-                }
-                movingTimeLeft += currentNode.PathLength();
-                ResetNodes(_input);
-                ResetNodes(working);
-
-                if (working.Count == 1)
-                {
-                    currentFlow += currentNode.Flow;
-                    movingTimeLeft = 1;
-                    working.RemoveAt(0);
-                }
-            }
-
-            /*if (working.Count > 0)
-            {
-                result += currentFlow;
-            }
-            else
-            {
-                result += currentFlow * (30 - i);
-                break;
-            }*/
-
-            movingTimeLeft--;
-
-            Console.WriteLine($"Minute: {i}");           
-            Console.WriteLine($"Total: {result}");
-            Console.WriteLine($"Current: {currentFlow}");
-            Console.WriteLine($"Valve: {currentNode.Name}");          
-        }
-
+        int result = MaxRelief(_input, currentNode, new bool[_input.Count], 30);
         return new(result.ToString());
     }
 
     public override ValueTask<string> Solve_2()
     {
-        throw new NotImplementedException();
+        int currentNode = _input.FindIndex(x => x.Name == "AA");
+
+        int result = MaxRelief(_input, currentNode, new bool[_input.Count], 26, true);
+        return new(result.ToString());
     }
 
-    private void ResetNodes(List<ValveNode> nodes)
+    private int MaxRelief(List<ValveNode> nodes, int nodeId, bool[] openedNodes, int timeLeft, bool elephant = false)
     {
-        foreach (ValveNode node in nodes)
+        if (timeLeft <= 0)
         {
-            node.PathParent = null;
-            node.FScore = 0;
-        }
-    }
-
-    private ValveNode BestNode(ValveNode node, List<ValveNode> nodeList, int timeLeft)
-    {
-        List<int> paths = new();
-        
-        for (int i = 0; i < nodeList.Count; i++)
-        {
-            if (node.Name != nodeList[i].Name)
+            if (elephant)
             {
-                LinkNodes(node, nodeList[i]);
-                paths.Add((timeLeft - nodeList[i].PathLength() - 1) * nodeList[i].Flow);
+                bool[] openedCopy = new bool[openedNodes.Length];
+                openedNodes.CopyTo(openedCopy, 0);
+
+                return MaxRelief(nodes, _input.FindIndex(x => x.Name == "AA"), openedCopy, 26);
             }
             else
             {
-                paths.Add(0);
+                return 0;
             }
         }
 
-        if (nodeList.Count == 1 && node.Name == nodeList[0].Name)
+        int maxRelief = 0;
+        ValveNode node = nodes[nodeId];
+
+        // Caching Code
+        int[] openedIntTemp = new int[3];
+        new BitArray(openedNodes).CopyTo(openedIntTemp, 0);
+
+        CacheKey stateCache = new(nodeId, openedIntTemp[0], openedIntTemp[1], openedIntTemp[2], timeLeft, elephant);
+
+        if (cache.ContainsKey(stateCache))
         {
-            return node;
+            return cache[stateCache];
         }
 
-        int closestId = paths.IndexOf(paths.Max());
-        ValveNode best = nodeList[closestId];
-        nodeList.RemoveAt(closestId);
+        for (int i = 0; i < node.NeighbourIds.Count; i++)
+        {
+            maxRelief = Math.Max(maxRelief, MaxRelief(nodes, node.NeighbourIds[i], openedNodes, timeLeft - 1, elephant));
+        }
 
-        return best;
+        if (openedNodes[nodeId] == false && node.Flow > 0)
+        {
+            bool[] openedCopy = new bool[openedNodes.Length];
+            openedNodes.CopyTo(openedCopy, 0);
+
+            openedCopy[nodeId] = true;
+            timeLeft--;
+
+            int totalReleased = timeLeft * node.Flow;
+
+            for (int i = 0; i < node.NeighbourIds.Count; i++)
+            {
+                maxRelief = Math.Max(maxRelief, totalReleased + MaxRelief(nodes, node.NeighbourIds[i], openedCopy, timeLeft - 1, elephant));
+            }
+        }
+
+        cache[stateCache] = maxRelief;
+
+        return maxRelief;
     }
 
-    private ValveNode FindValveNode(string valve, List<ValveNode> valveList)
+    private int FindValveNode(string valve, List<ValveNode> valveList)
     {
         for (int i = 0; i < valveList.Count; i++)
         {
             if (valveList[i].Name == valve)
             {
-                return valveList[i];
+                return i;
             }
         }
 
-        return null;
-    }
-
-    private void LinkNodes(ValveNode node1, ValveNode node2)
-    {
-        List<ValveNode> open = new();
-        List<ValveNode> closed = new();
-
-        open.Add(node1);
-
-        while (true)
-        {
-            open = open.OrderBy(x => x.FScore).ToList();
-            ValveNode current = open[0];
-
-            if (closed.Any(x => x.Name == current.Name))
-            {
-                open.RemoveAt(0);
-                continue;
-            }
-
-            open.RemoveAt(0);
-            closed.Add(current);
-
-            if (current.Name == node2.Name)
-            {
-                return;
-            }
-
-            foreach (ValveNode neighbour in current.Neighbours)
-            {
-                if ((neighbour.FScore == 0 || current.PathLength() + 1 < neighbour.FScore) && !closed.Any(x => x.Name == neighbour.Name))
-                {
-                    neighbour.PathParent = current;
-                    neighbour.FScore = neighbour.PathLength();   
-                }
-
-                open.Add(neighbour);
-            }
-        }
+        return -1;
     }
 
     private List<ValveNode> ParseInput()
@@ -189,7 +124,7 @@ public class Day16 : BaseDay
 
         for (int i = 0; i < input.Length; i++)
         {
-            nodes.Add(new ValveNode(0, Convert.ToInt32(flowRegex.Matches(input[i])[0].ToString()), connectionRegex.Matches(input[i])[0].ToString(), null, new List<AStarNode>()));
+            nodes.Add(new ValveNode(Convert.ToInt32(flowRegex.Matches(input[i])[0].ToString()), connectionRegex.Matches(input[i])[0].ToString(), new List<int>()));
         }
 
         for (int i = 0; i < nodes.Count; i++)
@@ -198,7 +133,7 @@ public class Day16 : BaseDay
 
             for (int j = 1; j < matches.Count; j++)
             {
-                nodes[i].Neighbours.Add(FindValveNode(matches[j].ToString(), nodes));
+                nodes[i].NeighbourIds.Add(FindValveNode(matches[j].ToString(), nodes));
             }
         }
 
