@@ -3,7 +3,6 @@ on:
   push:
     paths:
       - '*.cs' 
-  workflow_dispatch:
 
 jobs:
   update-readme:
