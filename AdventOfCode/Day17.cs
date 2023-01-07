@@ -68,57 +68,27 @@ public class Day17 : BaseDay
         return new((3999999999998 - HighestRock(chamber)).ToString());
     }
 
-    private int MoveRock(int[][] rock, ref bool[,] chamber, Coordinate rc, int offset, bool debug=false)
+    private int MoveRock(int[][] rock, ref bool[,] chamber, Coordinate rc, int offset, bool debug = false)
     {
         Coordinate down = new(1, 0);
         Coordinate left = new(0, -1);
         Coordinate right = new(0, 1);
         Coordinate[] jets = new Coordinate[] { left, right };
 
-        string[] names = new string[] { "left", "right" };
-
-        if (debug)
-        {
-            Console.WriteLine("Starts falling");
-            PrintChamber(chamber, rock, rc);
-        }        
-
         while (true)
         {
-            if (offset >= _input.Length) 
-                offset = 0;
+            if (offset >= _input.Length) offset = 0;
             if (CanMove(jets[_input[offset]], rc, rock, chamber) == 2)
             {
                 rc = new(rc.Item1 + jets[_input[offset]].Item1, rc.Item2 + jets[_input[offset]].Item2);
-                if (debug)
-                {
-                    Console.WriteLine($"Jets of gas {names[_input[offset]]} {offset}");
-                    PrintChamber(chamber, rock, rc);
-                }
-            }
-            else
-            {
-                if (debug) Console.WriteLine($"Doesn't move {names[_input[offset]]} {offset}");
             }
             if (CanMove(down, rc, rock, chamber) == 1)
             {
-                if (debug)
-                {
-                    Console.WriteLine($"Stops {offset}");
-                    PrintChamber(chamber, rock, rc);
-                }
                 offset++;
                 break;
             }
-            else
-            {
-                rc = new(rc.Item1 + down.Item1, rc.Item2 + down.Item2);
-                if (debug)
-                {
-                    Console.WriteLine($"Falls {offset}");
-                    PrintChamber(chamber, rock, rc);
-                }
-            }
+            else { rc = new(rc.Item1 + down.Item1, rc.Item2 + down.Item2); }
+
             offset++;
         }
 
@@ -142,40 +112,6 @@ public class Day17 : BaseDay
                 if (rock[i][j] == 1) chamber[rc.Item1 - (r1 - r2) + 1, rc.Item2 - (c1 - c2) + 1] = true;
             }
         }
-    }
-
-    private void PrintChamber(bool[,] chamber)
-    {
-        for (int row = 8040; row < 8087; row++)
-        {
-            Console.Write($"{row}:\t");
-            Console.Write("|");
-            for (int col = 0; col < 7; col++)
-            {
-                if (chamber[row, col] is false)
-                {
-                    Console.Write(".");
-                }
-                else
-                {
-                    Console.Write("#");
-                }
-            }
-            Console.Write("|");
-            Console.WriteLine();
-        }
-        Console.Write("8087:\t+-------+");
-        Console.WriteLine();
-    }
-
-    private void PrintChamber(bool[,] chamber, int[][] rock, Coordinate rc)
-    {
-        bool[,] oldChamber = new bool[chamber.Length,7];
-
-        Array.Copy(chamber, oldChamber, chamber.Length);
-
-        UpdateChamber(rock, ref oldChamber, rc);
-        PrintChamber(oldChamber);
     }
 
     private int CanMove(Coordinate direction, Coordinate rc, int[][] rock, bool[,] chamber)
