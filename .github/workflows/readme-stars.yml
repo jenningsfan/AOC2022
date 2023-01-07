@@ -1,9 +1,6 @@
 name: Update README ⭐
 on:
-  push:
-    paths:
-      - '*.cs' 
-  workflow_dispatch:
+  push: 
 
 jobs:
   update-readme:
