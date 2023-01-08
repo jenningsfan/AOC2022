@@ -7,7 +7,7 @@ public class Day17 : BaseDay
 {
     private readonly int[] _input;
     private readonly int[][][] rocks;
-    private Dictionary<CacheKey, long> cache;
+    private Dictionary<CacheKey, Tuple<long, long>> cache;
 
     public Day17()
     {
@@ -43,8 +43,6 @@ public class Day17 : BaseDay
         };
 
         rocks = new int[5][][] { rock1, rock2, rock3, rock4, rock5 };
-
-        cache = new Dictionary<CacheKey, long>();
     }
 
     public override ValueTask<string> Solve_1()
@@ -52,12 +50,33 @@ public class Day17 : BaseDay
         bool[,] chamber = new bool[8088, 7];
         int offset = 0;
 
+        long height = 0;
+        long remainingRocks = 0;
+
+        cache = new Dictionary<CacheKey, Tuple<long, long>>();
+
         for (int i = 0; i < 2022; i++)
         {
-            offset = MoveRock(i % 5, ref chamber, new Coordinate(HighestRock(chamber) - 3, 1 + rocks[i % 5][0].Length), offset);
+            Tuple<int, long, long> result = MoveRock(i % 5, ref chamber, new Coordinate(HighestRock(chamber) - 3, 1 + rocks[i % 5][0].Length), offset, i, 2022);
+            offset = result.Item1;
+
+            if (result.Item2 != -1)
+            {
+                height = result.Item2;
+                remainingRocks = result.Item3;
+                break;
+            }
         }
 
-        return new((8086 - HighestRock(chamber)).ToString());
+        long oldHighest = HighestRock(chamber);
+
+        for (int i = 0; i < remainingRocks; i++)
+        {
+            Tuple<int, long, long> result = MoveRock(i % 5, ref chamber, new Coordinate(HighestRock(chamber) - 3, 1 + rocks[i % 5][0].Length), offset, i, 2022);
+            offset = result.Item1;
+        }
+
+        return new((height + 8086 - (oldHighest - HighestRock(chamber))).ToString());
     }
 
     public override ValueTask<string> Solve_2()
@@ -65,39 +84,82 @@ public class Day17 : BaseDay
         bool[,] chamber = new bool[400000, 7];
         int offset = 0;
 
-        for (long i = 0; i < 1000; i++)
+        long height = 0;
+        long remainingRocks = 0;
+
+        cache = new Dictionary<CacheKey, Tuple<long, long>>();
+
+        for (int i = 0; i < 100000; i++)
         {
-            offset = MoveRock(i % 5, ref chamber, new Coordinate(HighestRock(chamber) - 3, 1 + rocks[i % 5][0].Length), offset);
+            Tuple<int, long, long> result = MoveRock(i % 5, ref chamber, new Coordinate(HighestRock(chamber) - 3, 1 + rocks[i % 5][0].Length), offset, i, 100000);
+            offset = result.Item1;
+
+            if (result.Item2 != -1)
+            {
+                height = result.Item2;
+                remainingRocks = result.Item3;
+                break;
+            }
         }
 
-        PrintChamber(chamber);
+        long oldHighest = HighestRock(chamber);
 
-        return new((3999999999998 - HighestRock(chamber)).ToString());
+        for (int i = 0; i < remainingRocks; i++)
+        {
+            Tuple<int, long, long> result = MoveRock(i % 5, ref chamber, new Coordinate(HighestRock(chamber) - 3, 1 + rocks[i % 5][0].Length), offset, i, 100000);
+            offset = result.Item1;
+        }
+
+        return new((height + 3999999999998 - (oldHighest - HighestRock(chamber))).ToString());
     }
 
-    private int MoveRock(long rockId, ref bool[,] chamber, Coordinate rc, int offset)
+    private Tuple<int, long, long> MoveRock(long rockId, ref bool[,] chamber, Coordinate rc, int offset, long rocksFallen, long totalRocks)
     {
         int[][] rock = rocks[rockId];
 
         while (true)
         {
-            Tuple<int, Coordinate> jetResult = MoveJets(offset, rc, rockId, chamber);
-            offset = jetResult.Item1;
-            rc = jetResult.Item2;
+            Coordinate jetResult = MoveJets(offset, rc, rockId, chamber, rocksFallen);
+            rc = jetResult;
 
-            Tuple<bool, int, Coordinate> downResult = MoveDown(offset, rc, rockId, chamber);
-            offset = downResult.Item2;
-            rc = downResult.Item3;
+            Tuple<bool, Coordinate> downResult = MoveDown(offset, rc, rockId, chamber, rocksFallen);
+            rc = downResult.Item2;
 
+            offset++;
+            if (offset >= _input.Length) offset = 0;
+
+            CacheKey cacheKey = CreateCacheKey(rockId, offset, chamber);
+            Tuple<bool, Tuple<long, long>> cacheResult = CheckCache(cacheKey);
+
+            if (cacheResult.Item1 is true)
+            {
+                long remainingShapes = totalRocks - rocksFallen;
+                long repeatsNeeded = remainingShapes / (rocksFallen - cacheResult.Item2.Item2); // Full repeats
+                remainingShapes %= cacheResult.Item2.Item2; // Remaining individual shapes
+
+                long heightDelta = ((8086 - HighestRock(chamber)) - (8086 - cacheResult.Item2.Item1)) * repeatsNeeded;
+                long newHeight = (8086 - HighestRock(chamber)) + heightDelta;
+
+                //Console.WriteLine(HighestRock(chamber));
+                Console.WriteLine(newHeight);
+                Console.WriteLine(remainingShapes);
+                return Tuple.Create(offset, newHeight, remainingShapes);
+            }
+            else
+            {
+                cache.Add(cacheKey, Tuple.Create(HighestRock(chamber), rocksFallen));
+            }
+            
+           
             if (downResult.Item1) break;
         }
 
         UpdateChamber(rock, ref chamber, rc);
 
-        return offset;
+        return Tuple.Create(offset, -1L, -1L);
     }
 
-    private Tuple<int, Coordinate> MoveJets(int offset, Coordinate rc, long rockId, bool[,] chamber)
+    private Coordinate MoveJets(int offset, Coordinate rc, long rockId, bool[,] chamber, long rocksDropped)
     {
         Coordinate left = new(0, -1);
         Coordinate right = new(0, 1);
@@ -105,28 +167,15 @@ public class Day17 : BaseDay
 
         int[][] rock = rocks[rockId];
 
-        if (offset >= _input.Length) offset = 0;
-
         if (CanMove(jets[_input[offset]], rc, rock, chamber) == 2)
         {
             rc = new(rc.Item1 + jets[_input[offset]].Item1, rc.Item2 + jets[_input[offset]].Item2);
         }
-
-        CacheKey cacheKey = CreateCacheKey(rockId, offset, chamber);
-        Tuple<bool, long> cacheResult = CheckCache(cacheKey);
-
-        if (cacheResult.Item1 is true)
-        {
-            Console.WriteLine("Cache hit");
-            return Tuple.Create(offset, rc);
-        }
-
-        cache.Add(cacheKey, HighestRock(chamber));
-
-        return Tuple.Create(offset, rc);
+        
+        return rc;
     }
 
-    private Tuple<bool, int, Coordinate> MoveDown(int offset, Coordinate rc, long rockId, bool[,] chamber)
+    private Tuple<bool, Coordinate> MoveDown(int offset, Coordinate rc, long rockId, bool[,] chamber, long rocksDropped)
     {
         Coordinate down = new(1, 0);
         int[][] rock = rocks[rockId];
@@ -135,20 +184,7 @@ public class Day17 : BaseDay
         if (CanMove(down, rc, rock, chamber) == 2) rc = new(rc.Item1 + down.Item1, rc.Item2 + down.Item2);
         else stopped = true;
 
-        offset++;
-
-        CacheKey cacheKey = CreateCacheKey(rockId, offset, chamber);
-        Tuple<bool, long> cacheResult = CheckCache(cacheKey);
-
-        if (cacheResult.Item1 is true)
-        {
-            Console.WriteLine("Cache hit");
-            return Tuple.Create(stopped, offset, rc);
-        }
-
-        cache.Add(cacheKey, HighestRock(chamber));
-
-        return Tuple.Create(stopped, offset, rc);
+        return Tuple.Create(stopped, rc);
     }
 
     private int CanMove(Coordinate direction, Coordinate rc, int[][] rock, bool[,] chamber)
@@ -210,7 +246,6 @@ public class Day17 : BaseDay
         return 0;
     }
 
-
     private CacheKey CreateCacheKey(long rockId, int jetOffset, bool[,] chamber)
     {
         long chamberLastRow = chamber.GetLongLength(0) - 1;
@@ -230,15 +265,15 @@ public class Day17 : BaseDay
         return new CacheKey(rockId, jetOffset, values[0], values[1], values[2], values[3]);
     }
 
-    private Tuple<bool, long> CheckCache(CacheKey cacheKey)
+    private Tuple<bool, Tuple<long, long>> CheckCache(CacheKey cacheKey)
     {
         if (cache.ContainsKey(cacheKey))
         {
-            return new Tuple<bool, long>(true, cache[cacheKey]);
+            return new Tuple<bool, Tuple<long, long>>(true, cache[cacheKey]);
         }
         else
         {
-            return new Tuple<bool, long>(false, -1);
+            return new Tuple<bool, Tuple<long, long>>(false, Tuple.Create(-1L, -1L));
         }
     }
     private void UpdateChamber(int[][] rock, ref bool[,] chamber, Coordinate rc)
